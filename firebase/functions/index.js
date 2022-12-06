@@ -7,3 +7,24 @@ const functions = require("firebase-functions");
 //   functions.logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+
+const functions = require("firebase-functions");
+const admin = require('firebase-admin');
+require("firebase-functions/lib/logger/compat");
+
+
+admin.initializeApp();
+const auth = admin.auth();
+
+
+exports.createUser = functions.auth.user().onCreate(async (user) => {
+    const docData = {
+        name: user.displayName,
+        email: user.email,
+        phoneNo: user.phoneNumber,
+        photoURL: user.photoURL,
+        uid: user.uid,
+    };
+
+    //
+});
