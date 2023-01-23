@@ -1,1 +1,4 @@
 .idea
+**/.env
+server/config/**/*
+!server/config/**/example.*
