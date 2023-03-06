@@ -20,35 +20,7 @@ const docTemplate = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
-    "paths": {
-        "/": {
-            "get": {
-                "description": "get details of all pools.",
-                "consumes": [
-                    "*/*"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "pools"
-                ],
-                "summary": "Get all the pools.",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            }
-        }
-    }
+    "paths": {}
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it

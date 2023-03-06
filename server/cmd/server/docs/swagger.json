@@ -11,7 +11,35 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "localhost:3000",
     "basePath": "/api",
-    "paths": {}
+    "paths": {
+        "/": {
+            "get": {
+                "description": "get details of all pools.",
+                "consumes": [
+                    "*/*"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pools"
+                ],
+                "summary": "Get all the pools.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        }
+    }
 }

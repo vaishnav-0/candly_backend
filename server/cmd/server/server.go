@@ -42,9 +42,10 @@ func repeatThis(i int) func() {
 }
 
 
-
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
 	c := config.GetConfig()
 	log := logging.New(c.Logging)
 
@@ -53,20 +54,22 @@ func main() {
 	// 	log.Error().Err(err).Msg("Error sending sms")
 
 	// }
-	dbClient, err := db.Open(c.Db.Host, c.Db.Username, c.Db.Password, c.Db.Name)
+	dbClient, err := db.Open(ctx, c.Db.Host, c.Db.Username, c.Db.Password, c.Db.Name)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Database connection error")
+		log.Fatal().Err(err).Msg("database connection error")
 	}
-	defer dbClient.Close(ctx)
-
+	defer dbClient.Close()
+	
 	rd := memstore.NewRedisClient(memstore.Config{})
 	
 	defer rd.Close()
 
-	market.StartFetchAndStore(rd, log)
+	err = market.StartFetchAndStore(rd, log)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot update market data")
+	}
 
 	serverHTTP := http.NewServerHTTP(http.Config{}, handler.NewHandler(dbClient, rd))
 	serverHTTP.Start()
 
-	// router.Run("0.0.0.0:8080")
 }

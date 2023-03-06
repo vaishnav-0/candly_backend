@@ -1,5 +1,5 @@
 basePath: /api
-host: localhost:8080
+host: localhost:3000
 info:
   contact:
     email: support@swagger.io
@@ -9,5 +9,23 @@ info:
   termsOfService: http://swagger.io/terms/
   title: Candly
   version: "1.0"
-paths: {}
+paths:
+  /:
+    get:
+      consumes:
+      - '*/*'
+      description: get details of all pools.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+      summary: Get all the pools.
+      tags:
+      - pools
 swagger: "2.0"

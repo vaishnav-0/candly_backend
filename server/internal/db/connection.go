@@ -7,6 +7,6 @@ import (
 
 )
 
-func Open(host, username, password, database string) (*pgxpool.Pool, error) {
-	return pgxpool.New(context.Background(), "postgresql://"+username+":"+url.QueryEscape(password)+"@"+host+"/"+database)
+func Open(ctx context.Context,host, username, password, database string) (*pgxpool.Pool, error) {
+	return pgxpool.New(ctx, "postgresql://"+username+":"+url.QueryEscape(password)+"@"+host+"/"+database)
 }

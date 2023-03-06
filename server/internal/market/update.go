@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v9"
+	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"golang.org/x/net/context"
 )
@@ -23,7 +24,7 @@ func StartFetchAndStore(store *redis.Client, log *zerolog.Logger) error {
 	defer mu.Unlock()
 
 	if started == 0 {
-		for _, v := range Pools {
+		for _, v := range PoolTypes {
 			go updateDataPeriodic(v, store, log)
 		}
 	}
@@ -32,22 +33,22 @@ func StartFetchAndStore(store *redis.Client, log *zerolog.Logger) error {
 
 }
 
-func updateDataPeriodic(pool Pool, store *redis.Client, log *zerolog.Logger) {
+func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger) {
 
 	nextPool, err := PredictNextData(pool.Symbol, pool.Interval.symbol)
 	if err != nil {
-		log.Err(err).Msg("Failed to get next pool " + pool.Id)
+		log.Err(err).Msg("Failed to get next pool " + pool.Type)
 		return
 	}
 	ctx := context.Background()
-
-	_, err = store.HSet(ctx, pool.Id, "OpenTime", nextPool.OpenTime, "CloseTime", nextPool.CloseTime).Result()
-
+	guid := xid.New()
+	_, err = store.HSet(ctx, pool.Type, "Id", guid.String(), "OpenTime", nextPool.OpenTime, "CloseTime", nextPool.CloseTime).Result()
+	store.Expire(ctx, pool.Type, pool.Interval.duration)
 	if err != nil {
-		log.Err(err).Msg("Failed to get next pool " + pool.Id)
+		log.Err(err).Msg("Failed to get next pool " + pool.Type)
 	}
 
-	time.AfterFunc(time.Duration(time.Now().UnixNano())-time.Duration(nextPool.OpenTime*1000000), func() { updateDataPeriodic(pool, store, log) })
+	time.AfterFunc(pool.Interval.duration, func() { updateDataPeriodic(pool, store, log) })
 
 }
 

@@ -44,9 +44,6 @@ func NewServerHTTP(config Config, handlers *handler.Handlers) *ServerHTTP {
 		api.GET("test", handlers.GetPools)
 	}
 
-	// api.GET("users/:id", userHandler.FindByID)
-	// api.POST("users", userHandler.Save)
-	// api.DELETE("users/:id", userHandler.Delete)
 
 	return &ServerHTTP{engine: engine}
 }

@@ -18,13 +18,15 @@ const auth = admin.auth();
 
 
 exports.createUser = functions.auth.user().onCreate(async (user) => {
-    const docData = {
+    const userData = {
         name: user.displayName,
         email: user.email,
         phoneNo: user.phoneNumber,
         photoURL: user.photoURL,
         uid: user.uid,
     };
+
+    
 
     //
 });
