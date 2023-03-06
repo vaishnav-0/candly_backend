@@ -7,7 +7,7 @@ import (
 
 
 
-// HealthCheck godoc
+// GetPools godoc
 // @Summary Get all the pools.
 // @Description get details of all pools.
 // @Tags pools
