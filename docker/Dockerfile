@@ -25,4 +25,5 @@ EXPOSE 8080
 
 USER nonroot:nonroot
 
+ARG CANDLY_MODE=production
 ENTRYPOINT ["/candly-server"]
