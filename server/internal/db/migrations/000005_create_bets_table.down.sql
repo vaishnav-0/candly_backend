@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS bets;
+DROP INDEX IF EXISTS index_bets_unwon;
