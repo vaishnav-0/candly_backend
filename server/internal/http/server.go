@@ -1,16 +1,21 @@
 package http
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	// swaggerfiles "github.com/swaggo/files"
 	// ginSwagger "github.com/swaggo/gin-swagger"
 
 	// _ "github.com/thnkrn/go-gin-clean-arch/cmd/api/docs"
+	"candly/internal/config"
 	"candly/internal/http/handler"
+
 	// middleware "github.com/thnkrn/go-gin-clean-arch/pkg/api/middleware"
+	_ "candly/cmd/server/docs"
+
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "candly/cmd/server/docs"
 )
 
 type ServerHTTP struct {
@@ -18,9 +23,13 @@ type ServerHTTP struct {
 }
 
 type Config struct {
+	Mode config.Mode
 }
 
-func NewServerHTTP(config Config, handlers *handler.Handlers) *ServerHTTP {
+func NewServerHTTP(conf Config, handlers *handler.Handlers) *ServerHTTP {
+	if conf.Mode == config.Production {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	engine := gin.New()
 
 	// Recovery middleware recovers from any panics and writes a 500 if there was one.
@@ -40,14 +49,17 @@ func NewServerHTTP(config Config, handlers *handler.Handlers) *ServerHTTP {
 	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api")
-	{
-		api.GET("test", handlers.GetPools)
-	}
 
+	pool := api.Group("/pool")
+	{
+		pool.GET("", handlers.GetPools)
+		pool.GET("/:id", handlers.GetBets)
+		pool.POST("/bet", handlers.Bet)
+	}
 
 	return &ServerHTTP{engine: engine}
 }
 
-func (sh *ServerHTTP) Start() {
-	sh.engine.Run(":3000")
+func (sh *ServerHTTP) Start(port int) {
+	sh.engine.Run(":" + fmt.Sprint(port))
 }

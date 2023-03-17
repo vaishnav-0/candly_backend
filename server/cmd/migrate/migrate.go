@@ -49,7 +49,7 @@ func main() {
 		if args[0] == "-d" {
 
 			if err = m.Steps(-version); err != nil {
-				fmt.Fprintf(os.Stderr, "Unable to force: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Unable to down: %v\n", err)
 				os.Exit(1)
 			}
 			return

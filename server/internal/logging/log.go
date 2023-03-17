@@ -3,34 +3,30 @@ package logging
 import (
 	"github.com/rs/zerolog"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"io"
 	"os"
 	"path"
-	"io"
 )
-
 
 // Configuration for logging
 type Config struct {
 	// Enable console logging
-	ConsoleLoggingEnabled bool
+	ConsoleLoggingEnabled bool `env:"LOGGING_CONSOLELOGGINGENABLED"`
 
 	// FileLoggingEnabled makes the framework log to a file
 	// the fields below can be skipped if this value is false!
-	FileLoggingEnabled bool
+	FileLoggingEnabled bool `env:"LOGGING_FILELOGGINGENABLED"`
 	// Directory to log to to when filelogging is enabled
-	Directory string
+	Directory string `env:"LOGGING_DIRECTORY"`
 	// Filename is the name of the logfile which will be placed inside the directory
-	Filename string
+	Filename string `env:"LOGGING_FILENAME"`
 	// MaxSize the max size in MB of the logfile before it's rolled
-	MaxSize int
+	MaxSize int `env:"LOGGING_MAXSIZE"`
 	// MaxBackups the max number of rolled files to keep
-	MaxBackups int
+	MaxBackups int `env:"LOGGING_MAXBACKUPS"`
 	// MaxAge the max age in days to keep a logfile
-	MaxAge int
+	MaxAge int `env:"LOGGING_MAXAGE"`
 }
-
-
-
 
 // Configure sets up the logging framework
 //
@@ -72,8 +68,8 @@ func New(config Config) *zerolog.Logger {
 func newRollingFile(config Config) io.Writer {
 	return &lumberjack.Logger{
 		Filename:   path.Join(config.Directory, config.Filename),
-		MaxBackups: config.MaxBackups,		// files
-		MaxSize:    config.MaxSize,			// megabytes
-		MaxAge:     config.MaxAge,			// days
+		MaxBackups: config.MaxBackups, // files
+		MaxSize:    config.MaxSize,    // megabytes
+		MaxAge:     config.MaxAge,     // days
 	}
 }
