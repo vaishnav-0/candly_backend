@@ -1,0 +1,1 @@
+CREATE TYPE pool_type AS ENUM ('1m', '5m');
