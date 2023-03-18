@@ -125,7 +125,6 @@ func GetPools(store *redis.Client) ([]map[string]string, error) {
 }
 
 func createPoolDB(db *pgxpool.Pool, pool *market.Pool, log *zerolog.Logger) {
-	fmt.Println("creating", pool)
 	q := queries.New(db)
 	ctx := context.Background()
 	openTime := pgtype.Int8{}

@@ -49,6 +49,7 @@ func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger,
 		log.Err(err).Msg("Failed to get next pool " + pool.Type)
 		return
 	}
+
 	time.Sleep(time.Until(time.UnixMilli(nextPool.OpenTime)))
 	go updateData(pool, store, log, ch)
 
@@ -74,8 +75,8 @@ func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan
 	if err != nil {
 		log.Err(err).Msg("Failed to get pool previous pool id: " + pool.Type)
 		return
-
 	}
+
 	prevClose, _ := strconv.ParseInt(prevPoolData["closeTime"], 10, 64)
 	prevOpen, _ := strconv.ParseInt(prevPoolData["openTime"], 10, 64)
 
@@ -85,7 +86,6 @@ func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan
 		OpenTime:  prevOpen,
 		CloseTime: prevClose,
 	}
-
 
 	guid := xid.New()
 	ctx := context.Background()
@@ -97,7 +97,9 @@ func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan
 		return
 	}
 
-
+	if prevPool.Id == ""{
+		return
+	}
 	ch <- UpdatePoolData{
 		NewPool: Pool{
 			Id:        guid.String(),
