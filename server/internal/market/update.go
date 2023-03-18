@@ -2,9 +2,13 @@ package market
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"candly/internal/memstore"
 
 	"github.com/go-redis/redis/v9"
 	"github.com/rs/xid"
@@ -12,12 +16,15 @@ import (
 	"golang.org/x/net/context"
 )
 
+type UpdatePoolData struct {
+	NewPool  Pool
+	PrevPool Pool
+}
+
 var mu sync.Mutex
 var started uint32
 
-type OnUpdate func(id string, openTime int64, closeTime int64, poolDuration time.Duration)
-
-func StartFetchAndStore(store *redis.Client, log *zerolog.Logger, onUpdateCB OnUpdate ) error {
+func StartFetchAndStore(store *redis.Client, log *zerolog.Logger, ch chan<- UpdatePoolData) error {
 
 	if atomic.LoadUint32(&started) == 1 {
 		return errors.New("already initialized")
@@ -27,7 +34,7 @@ func StartFetchAndStore(store *redis.Client, log *zerolog.Logger, onUpdateCB OnU
 
 	if started == 0 {
 		for _, v := range PoolTypes {
-			go updateDataPeriodic(v, store, log, onUpdateCB)
+			go updateDataPeriodic(v, store, log, ch)
 		}
 	}
 
@@ -35,25 +42,75 @@ func StartFetchAndStore(store *redis.Client, log *zerolog.Logger, onUpdateCB OnU
 
 }
 
-func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger, onUpdateCB OnUpdate) {
+func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan<- UpdatePoolData) {
 
-	nextPool, err := PredictNextData(pool.Symbol, pool.Interval.symbol)
+	nextPool, err := PredictNextData(pool.Symbol, pool.Interval.Symbol)
 	if err != nil {
 		log.Err(err).Msg("Failed to get next pool " + pool.Type)
 		return
 	}
-	ctx := context.Background()
-	guid := xid.New()
-	_, err = store.HSet(ctx, pool.Type, "id", guid.String(), "openTime", nextPool.OpenTime, "closeTime", nextPool.CloseTime).Result()
-	store.Expire(ctx, pool.Type, pool.Interval.duration)
-	if err != nil {
-		log.Err(err).Msg("Failed to get next pool " + pool.Type)
+	time.Sleep(time.Until(time.UnixMilli(nextPool.OpenTime)))
+	go updateData(pool, store, log, ch)
+
+	ticker := time.NewTicker(pool.Interval.Duration)
+
+	for i := range ticker.C {
+		fmt.Println(i)
+		go updateData(pool, store, log, ch)
 	}
 
-	onUpdateCB(guid.String(), nextPool.OpenTime, nextPool.CloseTime, pool.Interval.duration)
+}
 
-	time.AfterFunc(pool.Interval.duration, func() { updateDataPeriodic(pool, store, log, onUpdateCB) })
+func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan<- UpdatePoolData) {
 
+	nextPool, err := PredictNextData(pool.Symbol, pool.Interval.Symbol)
+	if err != nil {
+		log.Err(err).Msg("Failed to get next pool " + pool.Type)
+		return
+	}
+
+	prevPoolData, err := memstore.GetHash(store, pool.Type)
+
+	if err != nil {
+		log.Err(err).Msg("Failed to get pool previous pool id: " + pool.Type)
+		return
+
+	}
+	prevClose, _ := strconv.ParseInt(prevPoolData["closeTime"], 10, 64)
+	prevOpen, _ := strconv.ParseInt(prevPoolData["openTime"], 10, 64)
+
+	prevPool := Pool{
+		Id:        prevPoolData["id"],
+		PoolInfo:  pool,
+		OpenTime:  prevOpen,
+		CloseTime: prevClose,
+	}
+
+
+	guid := xid.New()
+	ctx := context.Background()
+	_, err = store.HSet(ctx, pool.Type, "id", guid.String(), "openTime", nextPool.OpenTime, "closeTime", nextPool.CloseTime).Result()
+	store.Expire(ctx, pool.Type, pool.Interval.Duration+time.Second*10)
+
+	if err != nil {
+		log.Err(err).Msg("Failed to get next pool " + pool.Type)
+		return
+	}
+
+
+	ch <- UpdatePoolData{
+		NewPool: Pool{
+			Id:        guid.String(),
+			OpenTime:  nextPool.OpenTime,
+			CloseTime: nextPool.CloseTime,
+			PoolInfo:  pool,
+		},
+		PrevPool: prevPool,
+	}
+}
+
+func GetPoolId(store *redis.Client, pool_type string) (string, error) {
+	return store.HGet(context.Background(), pool_type, "id").Result()
 }
 
 // func GetUpcomingCandle(id string, store *redis.Client) (*CandlestickData, error) {

@@ -53,8 +53,9 @@ func main() {
 		log.Fatal().Err(err).Msg("redis connection error")
 	}
 	defer rd.Close()
-
-	err = market.StartFetchAndStore(rd, log, betting.OnUpdateFn(rd, log))
+	
+	betCh := betting.OnUpdate(rd, dbClient, log)
+	err = market.StartFetchAndStore(rd, log, betCh)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot update market data")
 	}

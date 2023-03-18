@@ -89,10 +89,10 @@ func PredictNextData(symbol string, interval string) (*CandlestickData, error) {
 	}
 
 	var timeIncr int64
-	if(interval == Intervals.oneMin.symbol){
-		timeIncr = Intervals.oneMin.interval
-	}else if(interval == Intervals.fiveMin.symbol){
-		timeIncr = Intervals.fiveMin.interval
+	if(interval == Intervals.oneMin.Symbol){
+		timeIncr = Intervals.oneMin.Interval
+	}else if(interval == Intervals.fiveMin.Symbol){
+		timeIncr = Intervals.fiveMin.Interval
 	}else{
 		return nil, errors.New("time interval not found")
 	}

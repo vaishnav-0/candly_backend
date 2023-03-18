@@ -7,21 +7,32 @@ import (
 	"strconv"
 	"time"
 
+	"candly/internal/db/queries"
 	"candly/internal/market"
 	store "candly/internal/memstore"
 
 	"github.com/go-redis/redis/v9"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 	"golang.org/x/net/context"
 )
 
-func OnUpdateFn(store *redis.Client, log *zerolog.Logger) market.OnUpdate {
-	return func(id string, openTime int64, closeTime int64, poolDuration time.Duration) {
-		err := CreatePool(store, id, poolDuration)
-		if err != nil {
-			log.Err(err).Msg("failed to create pool")
+func OnUpdate(store *redis.Client, db *pgxpool.Pool, log *zerolog.Logger) (c chan market.UpdatePoolData) {
+	ch := make(chan market.UpdatePoolData)
+
+	go func() {
+		for poolData := range c {
+			err := CreatePool(store, poolData.NewPool.Id, poolData.NewPool.PoolInfo.Interval.Duration)
+			if err != nil {
+				log.Err(err).Msg("failed to create pool")
+			}
+			createPoolDB(db, &poolData.PrevPool, log)
 		}
-	}
+
+	}()
+
+	return ch
 }
 
 // type BetData struct {
@@ -59,7 +70,6 @@ func Bet(store *redis.Client, id string, user string, amount int64) error {
 	} else {
 		bet, err = strconv.ParseInt(betAmt.Val(), 10, 64)
 		if err != nil {
-			return fmt.Errorf("errorrrrrr. %w", err)
 			return err
 		}
 	}
@@ -112,4 +122,26 @@ func GetPools(store *redis.Client) ([]map[string]string, error) {
 		ret = append(ret, res)
 	}
 	return ret, nil
+}
+
+func createPoolDB(db *pgxpool.Pool, pool *market.Pool, log *zerolog.Logger) {
+	fmt.Println("creating", pool)
+	q := queries.New(db)
+	ctx := context.Background()
+	openTime := pgtype.Int8{}
+	openTime.Scan(pool.OpenTime)
+
+	closeTime := pgtype.Int8{}
+	closeTime.Scan(pool.CloseTime)
+
+	err := q.CreatePool(ctx, queries.CreatePoolParams{
+		ID:        pool.Id,
+		OpenTime:  openTime,
+		CloseTime: closeTime,
+		Type:      queries.PoolType(pool.PoolInfo.Interval.Symbol),
+	})
+
+	if err != nil {
+		log.Err(err).Msg("failed to insert pool")
+	}
 }
