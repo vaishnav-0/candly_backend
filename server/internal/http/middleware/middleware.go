@@ -1,4 +1,4 @@
-package handler
+package middleware
 
 import (
 	"candly/internal/auth"
@@ -8,19 +8,20 @@ import (
 )
 
 
-type Handlers struct{
+type Middlewares struct{
 	db *pgxpool.Pool 
 	rd *redis.Client
 	log *zerolog.Logger
 	auth *auth.Auth
 }
 
-func NewHandler(db *pgxpool.Pool, rd *redis.Client, log *zerolog.Logger, auth *auth.Auth) *Handlers{
-	return &Handlers{
+func NewMiddleware(db *pgxpool.Pool, rd *redis.Client, log *zerolog.Logger, auth *auth.Auth) *Middlewares{
+	return &Middlewares{
 		db:db,
 		rd: rd,
 		log: log,
 		auth: auth,
 	}
 }
+
 

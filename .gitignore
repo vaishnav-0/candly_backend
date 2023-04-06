@@ -2,3 +2,5 @@
 **/.env
 server/config/**/*
 !server/config/**/example.*
+server/cmd/test/
+*.pem

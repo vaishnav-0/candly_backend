@@ -1,7 +1,6 @@
 package betting
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -75,7 +74,7 @@ func Bet(store *redis.Client, id string, user string, amount int64) error {
 	}
 
 	if exist.Val() != 1 {
-		return errors.New("pool not found")
+		return PoolNotFoundError
 	}
 
 	_ = pipe.HSet(ctx, id, user, amount)
@@ -115,6 +114,10 @@ func GetPools(store *redis.Client) ([]map[string]string, error) {
 	for _, poolType := range market.PoolTypes {
 		ctx := context.Background()
 		res, err := store.HGetAll(ctx, poolType.Type).Result()
+		
+		if len(res) == 0{
+			continue
+		}
 
 		if err != nil {
 			return nil, err

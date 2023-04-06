@@ -1,1 +1,1 @@
-- Pass sensitive configs using environment variables
+- Blocking users on entering wrong otp

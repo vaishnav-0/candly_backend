@@ -22,6 +22,8 @@ type Config struct {
 	Db      db.Config
 	Redis   memstore.Config
 	Logging logging.Config
+	JWTKey string `env:"JWT_KEY"`
+	JWTPub string `env:"JWT_PUB"`
 }
 
 func GetConfig() Config {

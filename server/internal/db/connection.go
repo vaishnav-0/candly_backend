@@ -10,7 +10,7 @@ type Config struct {
 	Host     string `env:"DBHOST,notEmpty"`
 	Username string `env:"DBUSERNAME,notEmpty"`
 	Name     string `env:"DBNAME,notEmpty"`
-	Password string `env:"DBPASSWORD,notEmpty"`
+	Password string `env:"DBPASSWORD"`
 }
 
 func Open(ctx context.Context, host, username, password, database string) (*pgxpool.Pool, error) {

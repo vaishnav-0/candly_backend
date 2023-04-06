@@ -16,7 +16,7 @@ func main() {
 
 	m, err := migrate.New(
 		"file://internal/db/migrations",
-		"postgresql://"+c.Db.Username+":"+url.QueryEscape(c.Db.Password)+"@"+c.Db.Host+"/"+c.Db.Name)
+		"postgresql://"+c.Db.Username+":"+url.QueryEscape(c.Db.Password)+"@"+c.Db.Host+"/"+c.Db.Name+"?sslmode=disable")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
@@ -39,16 +39,24 @@ func main() {
 		}
 
 		if args[0] == "-u" {
-
-			if err = m.Steps(version); err != nil {
+			if version == -1 {
+				err = m.Up()
+			} else {
+				err = m.Steps(version)
+			}
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Unable to up: %v\n", err)
 				os.Exit(1)
 			}
 			return
 		}
 		if args[0] == "-d" {
-
-			if err = m.Steps(-version); err != nil {
+			if version == -1 {
+				err = m.Down()
+			} else {
+				err = m.Steps(-version)
+			}
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Unable to down: %v\n", err)
 				os.Exit(1)
 			}

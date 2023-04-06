@@ -17,12 +17,14 @@ import (
 	// "net/http"
 	"candly/internal/http"
 	"candly/internal/http/handler"
+	"candly/internal/http/middleware"
 	logging "candly/internal/logging"
 	"context"
 	"time"
 
 	// "github.com/gin-gonic/gin"
 	// comm "candly/internal/communication"
+	"candly/internal/auth"
 	"candly/internal/betting"
 	"candly/internal/config"
 	"candly/internal/db"
@@ -53,14 +55,16 @@ func main() {
 		log.Fatal().Err(err).Msg("redis connection error")
 	}
 	defer rd.Close()
-	
+
 	betCh := betting.OnUpdate(rd, dbClient, log)
 	err = market.StartFetchAndStore(rd, log, betCh)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot update market data")
 	}
 
-	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode}, handler.NewHandler(dbClient, rd, log))
+	auth := auth.New(c.JWTKey, c.JWTPub, rd, dbClient)
+
+	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode}, handler.NewHandler(dbClient, rd, log, auth), middleware.NewMiddleware(dbClient, rd, log, auth))
 	serverHTTP.Start(3000)
 
 }
