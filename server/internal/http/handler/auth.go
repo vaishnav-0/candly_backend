@@ -20,7 +20,7 @@ func (h *Handlers) GenerateOTP(c *gin.Context) {
 
 	body := GenerateOTPBody{}
 	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "mobile number is required"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, JSONMessage("mobile number is required"))
 		return
 	}
 
@@ -35,10 +35,10 @@ func (h *Handlers) GenerateOTP(c *gin.Context) {
 	err = h.auth.StoreOTP(body.Phone, otp)
 
 	if err == auth.OTPLimitError {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "OTP limit exceeded"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, JSONMessage("OTP limit exceeded"))
 		return
 	} else if err == auth.OTPRetryError {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "OTP wait time not reached"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, JSONMessage("OTP wait time not reached"))
 		return
 	}
 
@@ -50,7 +50,7 @@ func (h *Handlers) VerifyOTP(c *gin.Context) {
 
 	body := VerifyOTPBody{}
 	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "mobile number and otp is required"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, JSONMessage("mobile number and otp is required"))
 		return
 	}
 
@@ -68,11 +68,11 @@ func (h *Handlers) VerifyOTP(c *gin.Context) {
 
 	} else if err == auth.OTPInvalidError {
 
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "invalid otp"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, JSONMessage("invalid otp"))
 
 	} else if err == auth.OTPRetryError {
 
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "otp retries exceeded"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, JSONMessage("otp retries exceeded"))
 
 	}
 

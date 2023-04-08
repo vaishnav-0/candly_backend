@@ -66,7 +66,7 @@ func (h *Handlers) Bet(c *gin.Context) {
 	fmt.Println(claims)
 	err := betting.Bet(h.rd, data.Id, claims.User, data.Amount)
 	if err == betting.PoolNotFoundError {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "pool not found"})
+		c.JSON(http.StatusBadRequest, JSONMessage("pool not found"))
 		return
 	}
 	if err != nil {
