@@ -1,1 +1,3 @@
-- Blocking users on entering wrong otp
+- [ ] Blocking users on entering wrong otp
+- [ ] ratelimiting and blocking
+- [ ] refresh token

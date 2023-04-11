@@ -53,6 +53,7 @@ func NewServerHTTP(conf Config, handlers *handler.Handlers, middlwares *middlewa
 	{
 		auth.POST("/validate", handlers.VerifyOTP)
 		auth.POST("/generateOTP", handlers.GenerateOTP)
+		auth.POST("/register", middlwares.AuthorizeNewUserToken(), handlers.RegisterUser)
 	}
 
 	authorized := api.Group("/")

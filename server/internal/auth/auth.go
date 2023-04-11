@@ -15,8 +15,13 @@ import (
 
 	"github.com/go-redis/redis/v9"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/ssh"
+
+	"candly/internal/db/queries"
 )
 
 const authPrefix = "auth"
@@ -24,10 +29,12 @@ const otpRegenerateTime = 5
 const OTPMaxRegeneration = 3
 const OTPMaxRetries = 3
 
-var OTPLimitError = errors.New("OTP limit exceeded")
-var OTPRetryError = errors.New("OTP regenerate wait time not reached")
-var OTPInvalidError = errors.New("OTP invalid")
-var OTPTriesExceededError = errors.New("OTP tries reached")
+var ErrOTPLimit = errors.New("OTP limit exceeded")
+var ErrOTPRetry = errors.New("OTP regenerate wait time not reached")
+var ErrOTPInvalid = errors.New("OTP invalid")
+var ErrOTPTriesExceeded = errors.New("OTP tries reached")
+
+var ErrUserAlreadyExist = errors.New("user already exist")
 
 type Auth struct {
 	jwt_key interface{}
@@ -36,9 +43,15 @@ type Auth struct {
 	db      *pgxpool.Pool
 }
 
-type JwtClaims struct {
-	Role string `json:"role"`
-	User string `json:"user"`
+type JwtUserClaims struct {
+	Roles []string `json:"roles"`
+	User  string   `json:"user"`
+	jwt.RegisteredClaims
+}
+
+type JwtNewUserClaims struct {
+	Roles []string `json:"roles"`
+	Phone string   `json:"phone"`
 	jwt.RegisteredClaims
 }
 
@@ -61,7 +74,7 @@ func New(key string, pubKey string, rd *redis.Client, db *pgxpool.Pool) *Auth {
 
 	ed25519Key, err := jwt.ParseEdPublicKeyFromPEM(pKey)
 	if err != nil {
-		panic(fmt.Errorf("Unable to parse Ed25519 public key: %w", err))
+		panic(fmt.Errorf("unable to parse Ed25519 public key: %w", err))
 	}
 
 	if err != nil {
@@ -103,7 +116,7 @@ func (a *Auth) StoreOTP(phone string, otp string) error {
 		tries, _ := strconv.ParseInt(res, 10, 64)
 
 		if tries == OTPMaxRegeneration {
-			return OTPLimitError
+			return ErrOTPLimit
 		}
 
 		res, _ = a.rd.HGet(ctx, id, "time").Result()
@@ -113,7 +126,7 @@ func (a *Auth) StoreOTP(phone string, otp string) error {
 			t, _ := strconv.ParseInt(res, 10, 64)
 			fmt.Println(t - time.Now().Unix())
 			if (time.Now().Unix() - t) < otpRegenerateTime {
-				return OTPRetryError
+				return ErrOTPRetry
 			}
 		}
 
@@ -139,7 +152,7 @@ func (a *Auth) VerifyOTP(phone string, otp string) error {
 	tries, _ := strconv.ParseInt(tr, 10, 64)
 
 	if tries == OTPMaxRetries {
-		return OTPRetryError
+		return ErrOTPRetry
 	}
 
 	_ = a.rd.HIncrBy(ctx, id, "tries", 1)
@@ -148,7 +161,7 @@ func (a *Auth) VerifyOTP(phone string, otp string) error {
 		a.rd.Del(ctx, id)
 		return nil
 	} else {
-		return OTPInvalidError
+		return ErrOTPInvalid
 	}
 
 }
@@ -157,10 +170,29 @@ func (a *Auth) GenerateJWT(phone string) (string, error) {
 
 	token := jwt.New(jwt.SigningMethodEdDSA)
 	claims := token.Claims.(jwt.MapClaims)
-	claims["exp"] = time.Now().Add(2 * time.Hour).Unix()
-	claims["authorized"] = true
-	claims["user"] = "username"
-	claims["role"] = "user"
+
+	q := queries.New(a.db)
+	ctx := context.Background()
+
+	user, err := q.GetUserFromPhone(ctx, phone)
+
+	if err == pgx.ErrNoRows {
+
+		claims["exp"] = time.Now().Add(20 * time.Minute).Unix()
+		claims["roles"] = []string{"new"}
+		claims["phone"] = phone
+
+	} else if err == nil {
+
+		claims["exp"] = time.Now().Add(2 * time.Hour).Unix()
+		claims["user"] = user.Name
+		claims["roles"] = []string{"user"}
+
+	} else {
+
+		return "", err
+
+	}
 
 	tokenString, err := token.SignedString(a.jwt_key)
 
@@ -171,21 +203,80 @@ func (a *Auth) GenerateJWT(phone string) (string, error) {
 	return tokenString, nil
 }
 
-func (a *Auth) VerifyJWT(token string) (*JwtClaims, error) {
+func (a *Auth) VerifyJWT(token string, claims jwt.Claims) (*jwt.Token, error) {
 
-	tkn, err := jwt.ParseWithClaims(token, &JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
+	return jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		return a.jwt_pub, nil
 	})
+
+}
+
+func (a *Auth) VerifyUserJWT(token string) (*JwtUserClaims, error) {
+
+	tkn, err := a.VerifyJWT(token, &JwtUserClaims{})
 
 	if err != nil {
 		return nil, err
 	}
 
-	if claims, ok := tkn.Claims.(*JwtClaims); ok && tkn.Valid {
-		// fmt.Println(claims)
+	if claims, ok := tkn.Claims.(*JwtUserClaims); ok && tkn.Valid {
+
 		return claims, nil
+
 	} else {
-		return nil, errors.New("Invalid claims")
+
+		return nil, errors.New("invalid claims")
+
 	}
+
+}
+
+func (a *Auth) VerifyNewUserJWT(token string) (*JwtNewUserClaims, error) {
+
+	tkn, err := a.VerifyJWT(token, &JwtNewUserClaims{})
+
+	if err != nil {
+		fmt.Print(err)
+		return nil, err
+	}
+
+	if claims, ok := tkn.Claims.(*JwtNewUserClaims); ok && tkn.Valid {
+
+		return claims, nil
+
+	} else {
+
+		return nil, errors.New("invalid claims")
+
+	}
+
+}
+
+func (a *Auth) RegisterUser(name string, email string, phone string) error {
+
+	q := queries.New(a.db)
+	ctx := context.Background()
+	nameText := pgtype.Text{}
+	nameText.Scan(name)
+
+	emailText := pgtype.Text{}
+	emailText.Scan(name)
+
+	err := q.InsertUser(ctx, queries.InsertUserParams{
+		Name:  nameText,
+		Phone: phone,
+		Email: emailText,
+	})
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505"{
+				return ErrUserAlreadyExist
+			}
+		}
+	}
+
+	return err
 
 }
