@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 
 	"candly/internal/auth"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/go-redis/redis/v9"
+	"github.com/rs/zerolog"
 )
 
 type BettingData struct {
@@ -29,53 +30,63 @@ type BettingData struct {
 //	@Failure		500
 //
 // @Router /pools/get [get]
-func (h *Handlers) GetPools(c *gin.Context) {
-	pools, err := betting.GetPools(h.rd)
 
-	if err != nil {
-		h.log.Error().Err(err).Msg("cannot get pools")
-		c.Status(http.StatusInternalServerError)
-		return
+func GetPools(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		pools, err := betting.GetPools(rd)
+
+		if err != nil {
+			log.Error().Err(err).Msg("cannot get pools")
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.JSON(http.StatusOK, pools)
+
 	}
-
-	c.JSON(http.StatusOK, pools)
-
 }
 
-func (h *Handlers) GetBets(c *gin.Context) {
-	bets, err := betting.GetBets(h.rd, c.Param("id"))
-	if err != nil {
-		h.log.Error().Err(err).Msg("cannot get bets")
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-	if len(bets) == 0 {
-		c.Status(http.StatusNotFound)
-		return
-	}
 
-	c.JSON(http.StatusOK, bets)
+func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		bets, err := betting.GetBets(rd, c.Param("id"))
+		if err != nil {
+			log.Error().Err(err).Msg("cannot get bets")
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		if len(bets) == 0 {
+			c.Status(http.StatusNotFound)
+			return
+		}
 
+		c.JSON(http.StatusOK, bets)
+
+	}
 }
 
-func (h *Handlers) Bet(c *gin.Context) {
-	var data BettingData
-	c.MustBindWith(&data, binding.JSON)
 
-	cl, _ := c.Get("claims")
-	claims := cl.(*auth.JwtUserClaims)
-	fmt.Println(claims)
-	err := betting.Bet(h.rd, data.Id, claims.User, data.Amount)
-	if err == betting.PoolNotFoundError {
-		c.JSON(http.StatusBadRequest, helpers.JSONMessage("pool not found"))
-		return
+func Bet(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		var data BettingData
+		c.MustBindWith(&data, binding.JSON)
+
+		cl, _ := c.Get("claims")
+		claims := cl.(*auth.JwtUserClaims)
+
+		err := betting.Bet(rd, data.Id, claims.User, data.Amount)
+		if err == betting.PoolNotFoundError {
+			c.JSON(http.StatusBadRequest, helpers.JSONMessage("pool not found"))
+			return
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("cannot bet")
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.Status(http.StatusOK)
+
 	}
-	if err != nil {
-		h.log.Error().Err(err).Msg("cannot bet")
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.Status(http.StatusOK)
-
 }

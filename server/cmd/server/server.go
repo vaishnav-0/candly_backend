@@ -16,8 +16,6 @@ import (
 
 	// "net/http"
 	"candly/internal/http"
-	"candly/internal/http/handler"
-	"candly/internal/http/middleware"
 	logging "candly/internal/logging"
 	"context"
 	"time"
@@ -64,7 +62,9 @@ func main() {
 
 	auth := auth.New(c.JWTKey, c.JWTPub, rd, dbClient)
 
-	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode}, handler.NewHandler(dbClient, rd, log, auth), middleware.NewMiddleware(dbClient, rd, log, auth))
+	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode},
+		&http.Dep{Db: dbClient, Rd: rd, Log: log, Auth: auth})
+		
 	serverHTTP.Start(3000)
 
 }

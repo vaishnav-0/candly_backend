@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 
 	"candly/internal/auth"
 	"candly/internal/http/helpers"
@@ -18,63 +19,84 @@ type VerifyOTPBody struct {
 	Otp   string `json:"otp"`
 }
 
-func (h *Handlers) GenerateOTP(c *gin.Context) {
+// Generates otp for a user
+//
+//  @Summary      List accounts
+//  @Description  get accounts
+//  @Tags         accounts
+//  @Accept       json
+//  @Produce      json
+//  @Param        q    query     string  false  "name search by q"  Format(email)
+//  @Success      200  {array}   model.Account
+//  @Failure      400  {object}  httputil.HTTPError
+//  @Failure      404  {object}  httputil.HTTPError
+//  @Failure      500  {object}  httputil.HTTPError
+//  @Router       /accounts [get]
 
-	body := GenerateOTPBody{}
-	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number is required"))
-		return
-	}
+func GenerateOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
 
-	otp, err := h.auth.GenerateOTP()
+		body := GenerateOTPBody{}
+		if err := c.BindJSON(&body); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number is required"))
+			return
+		}
 
-	if err != nil {
-		h.log.Error().Err(err).Msg("cannot generate OPT")
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	err = h.auth.StoreOTP(body.Phone, otp)
-
-	if err == auth.ErrOTPLimit {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("OTP limit exceeded"))
-		return
-	} else if err == auth.ErrOTPRetry {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("OTP wait time not reached"))
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"otp": otp})
-
-}
-
-func (h *Handlers) VerifyOTP(c *gin.Context) {
-
-	body := VerifyOTPBody{}
-	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number and otp is required"))
-		return
-	}
-
-	if err := h.auth.VerifyOTP(body.Phone, body.Otp); err == nil {
-
-		token, err := h.auth.GenerateJWT(body.Phone)
+		otp, err := a.GenerateOTP()
 
 		if err != nil {
-			h.log.Error().Err(err).Msg("cannot generate jwt")
+			log.Error().Err(err).Msg("cannot generate OPT")
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"access_token": token})
+		err = a.StoreOTP(body.Phone, otp)
 
-	} else if err == auth.ErrOTPInvalid {
+		if err == auth.ErrOTPLimit {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("OTP limit exceeded"))
+			return
+		} else if err == auth.ErrOTPRetry {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("OTP wait time not reached"))
+			return
+		}
 
-		c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("invalid otp"))
+		c.JSON(http.StatusOK, gin.H{"otp": otp})
 
-	} else if err == auth.ErrOTPRetry {
+	}
 
-		c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("otp retries exceeded"))
+}
+
+func VerifyOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+
+		body := VerifyOTPBody{}
+		if err := c.BindJSON(&body); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number and otp is required"))
+			return
+		}
+
+		if err := a.VerifyOTP(body.Phone, body.Otp); err == nil {
+
+			token, err := a.GenerateJWT(body.Phone)
+
+			if err != nil {
+				log.Error().Err(err).Msg("cannot generate jwt")
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"access_token": token})
+
+		} else if err == auth.ErrOTPInvalid {
+
+			c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("invalid otp"))
+
+		} else if err == auth.ErrOTPRetry {
+
+			c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage("otp retries exceeded"))
+
+		}
 
 	}
 
@@ -85,7 +107,8 @@ type RegisterUserBody struct {
 	Email string `json:"email" binding:"email"`
 }
 
-func (h *Handlers) RegisterUser(c *gin.Context) {
+func RegisterUser(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
+	return func (c *gin.Context) {
 	body := RegisterUserBody{}
 	if err := c.BindJSON(&body); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
@@ -100,7 +123,7 @@ func (h *Handlers) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.RegisterUser(body.Name, body.Email, claims.Phone); err != nil {
+	if err := a.RegisterUser(body.Name, body.Email, claims.Phone); err != nil {
 		if err == auth.ErrUserAlreadyExist {
 
 			c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("already registered"))
@@ -110,15 +133,17 @@ func (h *Handlers) RegisterUser(c *gin.Context) {
 		}
 		return
 	}
-	token, err := h.auth.GenerateJWT(claims.Phone)
+	token, err := a.GenerateJWT(claims.Phone)
 
 	if err != nil {
-		h.log.Error().Err(err).Msg("cannot generate jwt")
+		log.Error().Err(err).Msg("cannot generate jwt")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
 	c.JSON(http.StatusOK,
 		helpers.AppendJSONMessage("registration successful", gin.H{"access_token": token}))
+
+}
 
 }

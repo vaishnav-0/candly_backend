@@ -5,9 +5,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v9"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 	"github.com/semihalev/gin-stats"
 
 	// _ "github.com/thnkrn/go-gin-clean-arch/cmd/api/docs"
+	"candly/internal/auth"
 	"candly/internal/config"
 	"candly/internal/http/handler"
 	"candly/internal/http/middleware"
@@ -24,10 +28,18 @@ type ServerHTTP struct {
 }
 
 type Config struct {
-	Mode config.Mode
+	Mode          config.Mode
+	SwaggerAPIKey string
 }
 
-func NewServerHTTP(conf Config, handlers *handler.Handlers, middlwares *middleware.Middlewares) *ServerHTTP {
+type Dep struct {
+	Db   *pgxpool.Pool
+	Rd   *redis.Client
+	Log  *zerolog.Logger
+	Auth *auth.Auth
+}
+
+func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 	if conf.Mode == config.Production {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -45,27 +57,28 @@ func NewServerHTTP(conf Config, handlers *handler.Handlers, middlwares *middlewa
 	})
 
 	//swagger
-	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	engine.GET("/swagger/*any", middleware.AuthorizeAPIKey(conf.SwaggerAPIKey),
+		ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api")
 
 	auth := api.Group("/auth")
 	{
-		auth.POST("/validate", handlers.VerifyOTP)
-		auth.POST("/generateOTP", handlers.GenerateOTP)
-		auth.POST("/register", middlwares.AuthorizeNewUserToken(), handlers.RegisterUser)
+		auth.POST("/validate", handler.VerifyOTP(dep.Auth, dep.Log))
+		auth.POST("/generateOTP", handler.GenerateOTP(dep.Auth, dep.Log))
+		auth.POST("/register", middleware.AuthorizeNewUserToken(dep.Auth), handler.RegisterUser(dep.Auth, dep.Log))
 	}
 
 	authorized := api.Group("/")
 
 	// Auth middleware
-	authorized.Use(middlwares.AuthorizeToken())
+	authorized.Use(middleware.AuthorizeToken(dep.Auth))
 	{
 		pool := authorized.Group("/pool")
 		{
-			pool.GET("", handlers.GetPools)
-			pool.GET("/:id", handlers.GetBets)
-			pool.POST("/bet", handlers.Bet)
+			pool.GET("", handler.GetPools(dep.Rd, dep.Log))
+			pool.GET("/:id", handler.GetBets(dep.Rd, dep.Log))
+			pool.POST("/bet", handler.Bet(dep.Rd, dep.Log))
 		}
 
 	}

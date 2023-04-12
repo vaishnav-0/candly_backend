@@ -19,6 +19,7 @@ const (
 
 type Config struct {
 	Mode    Mode `env:"MODE,notEmpty"`
+	SwaggerAPIKey string `env:"SWAGGER_API_KEY,notEmpty"`
 	Db      db.Config
 	Redis   memstore.Config
 	Logging logging.Config
