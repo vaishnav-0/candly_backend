@@ -62,6 +62,12 @@ func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger,
 
 }
 
+type PoolData struct {
+	Id        string
+	OpenTime  string 
+	CloseTime string 
+}
+
 func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan<- UpdatePoolData) {
 
 	nextPool, err := PredictNextData(pool.Symbol, pool.Interval.Symbol)
@@ -97,7 +103,7 @@ func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan
 		return
 	}
 
-	if prevPool.Id == ""{
+	if prevPool.Id == "" {
 		return
 	}
 	ch <- UpdatePoolData{

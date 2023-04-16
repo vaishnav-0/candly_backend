@@ -19,20 +19,6 @@ type VerifyOTPBody struct {
 	Otp   string `json:"otp"`
 }
 
-// Generates otp for a user
-//
-//  @Summary      List accounts
-//  @Description  get accounts
-//  @Tags         accounts
-//  @Accept       json
-//  @Produce      json
-//  @Param        q    query     string  false  "name search by q"  Format(email)
-//  @Success      200  {array}   model.Account
-//  @Failure      400  {object}  httputil.HTTPError
-//  @Failure      404  {object}  httputil.HTTPError
-//  @Failure      500  {object}  httputil.HTTPError
-//  @Router       /accounts [get]
-
 func GenerateOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -78,15 +64,23 @@ func VerifyOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 		if err := a.VerifyOTP(body.Phone, body.Otp); err == nil {
 
-			token, err := a.GenerateJWT(body.Phone)
+			access, refresh, err := a.GenerateTokens(body.Phone)
 
 			if err != nil {
-				log.Error().Err(err).Msg("cannot generate jwt")
+				log.Error().Err(err).Msg("cannot generate access token")
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
 
-			c.JSON(http.StatusOK, gin.H{"access_token": token})
+			if refresh == "" {
+
+				c.JSON(http.StatusOK, gin.H{"access_token": access})
+
+			} else {
+
+				c.JSON(http.StatusOK, gin.H{"access_token": access, "refresh_token": refresh})
+
+			}
 
 		} else if err == auth.ErrOTPInvalid {
 
@@ -108,42 +102,69 @@ type RegisterUserBody struct {
 }
 
 func RegisterUser(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
-	return func (c *gin.Context) {
-	body := RegisterUserBody{}
-	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
-		return
-	}
-	c.Get("claims")
-
-	claims, ok := helpers.GetNewUserClaims(c)
-
-	if !ok {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("cannot parse token"))
-		return
-	}
-
-	if err := a.RegisterUser(body.Name, body.Email, claims.Phone); err != nil {
-		if err == auth.ErrUserAlreadyExist {
-
-			c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("already registered"))
-		} else {
-
-			c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("server error"))
+	return func(c *gin.Context) {
+		body := RegisterUserBody{}
+		if err := c.BindJSON(&body); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
+			return
 		}
-		return
-	}
-	token, err := a.GenerateJWT(claims.Phone)
+		c.Get("claims")
 
-	if err != nil {
-		log.Error().Err(err).Msg("cannot generate jwt")
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+		claims, ok := helpers.GetNewUserClaims(c)
 
-	c.JSON(http.StatusOK,
-		helpers.AppendJSONMessage("registration successful", gin.H{"access_token": token}))
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("cannot parse token"))
+			return
+		}
+
+		if err := a.RegisterUser(body.Name, body.Email, claims.Phone); err != nil {
+			if err == auth.ErrUserAlreadyExist {
+
+				c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("already registered"))
+			} else {
+
+				c.AbortWithStatusJSON(http.StatusInternalServerError, helpers.JSONMessage("server error"))
+			}
+			return
+		}
+		token, refresh, err := a.GenerateTokens(claims.Phone)
+
+		if err != nil {
+			log.Error().Err(err).Msg("cannot generate jwt")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		c.JSON(http.StatusOK,
+			helpers.AppendJSONMessage("registration successful", gin.H{"access_token": token, "refresh_token": refresh}))
+
+	}
 
 }
 
+type RefreshTokenBody struct {
+	Token string `json:"token"  binding:"required"`
+}
+
+func RefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+
+		body := RefreshTokenBody{}
+		if err := c.BindJSON(&body); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
+			return
+		}
+
+		access, err := a.AccessFromRefresh(body.Token)
+
+		if err != nil {
+			log.Error().Err(err).Msg("cannot generate access token")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"access_token": access})
+
+	}
 }

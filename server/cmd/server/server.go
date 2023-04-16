@@ -9,6 +9,9 @@
 
 // @host      localhost:3000
 // @BasePath  /api
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 
 package main
 
@@ -60,11 +63,11 @@ func main() {
 		log.Fatal().Err(err).Msg("cannot update market data")
 	}
 
-	auth := auth.New(c.JWTKey, c.JWTPub, rd, dbClient)
+	auth := auth.New(c.JWTKey, c.JWTPub, rd, dbClient, log)
 
-	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode},
+	serverHTTP := http.NewServerHTTP(http.Config{Mode: c.Mode, SwaggerAPIKey: c.SwaggerAPIKey},
 		&http.Dep{Db: dbClient, Rd: rd, Log: log, Auth: auth})
-		
+
 	serverHTTP.Start(3000)
 
 }

@@ -1,3 +1,4 @@
 - [ ] Blocking users on entering wrong otp
 - [ ] ratelimiting and blocking
-- [ ] refresh token
+- [ ] refresh token revocation
+- [ ] complete api documentation

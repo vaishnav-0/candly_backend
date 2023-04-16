@@ -1,16 +1,17 @@
 package handler
 
 import (
-	"net/http"
-
 	"candly/internal/auth"
 	"candly/internal/betting"
 	"candly/internal/http/helpers"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-redis/redis/v9"
 	"github.com/rs/zerolog"
+
+	_ "github.com/swaggo/swag/example/basic/web"
 )
 
 type BettingData struct {
@@ -19,18 +20,15 @@ type BettingData struct {
 	Amount int64
 }
 
-// GetPools godoc
-// @Summary Get all the pools.
-// @Description get details of all pools.
-// @Tags pools
-// @Accept */*
-// @Produce json
-// @Success 200 {object} map[string]interface{}
+// GetStringByInt example
 //
-//	@Failure		500
-//
-// @Router /pools/get [get]
-
+//	@Summary		Get pools
+//	@Description	get the details of all the pools
+//	@ID				get-pools
+//	@Produce		json	
+//	@Success		200		{object}	market.PoolData
+//	@Failure		400
+//	@Router			/pool [get]
 func GetPools(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		pools, err := betting.GetPools(rd)
@@ -45,7 +43,6 @@ func GetPools(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 	}
 }
-
 
 func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -64,7 +61,6 @@ func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 	}
 }
-
 
 func Bet(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 

@@ -19,12 +19,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 	"golang.org/x/crypto/ssh"
 
 	"candly/internal/db/queries"
 )
 
 const authPrefix = "auth"
+const authRefreshPrefix = "ref:"
 const otpRegenerateTime = 5
 const OTPMaxRegeneration = 3
 const OTPMaxRetries = 3
@@ -35,12 +37,14 @@ var ErrOTPInvalid = errors.New("OTP invalid")
 var ErrOTPTriesExceeded = errors.New("OTP tries reached")
 
 var ErrUserAlreadyExist = errors.New("user already exist")
+var ErrUserUnregistered = errors.New("user already exist")
 
 type Auth struct {
 	jwt_key interface{}
 	jwt_pub interface{}
 	rd      *redis.Client
 	db      *pgxpool.Pool
+	log     *zerolog.Logger
 }
 
 type JwtUserClaims struct {
@@ -55,7 +59,7 @@ type JwtNewUserClaims struct {
 	jwt.RegisteredClaims
 }
 
-func New(key string, pubKey string, rd *redis.Client, db *pgxpool.Pool) *Auth {
+func New(key string, pubKey string, rd *redis.Client, db *pgxpool.Pool, log *zerolog.Logger) *Auth {
 	keyData, err := os.ReadFile(key)
 
 	if err != nil {
@@ -86,6 +90,7 @@ func New(key string, pubKey string, rd *redis.Client, db *pgxpool.Pool) *Auth {
 		jwt_pub: ed25519Key,
 		rd:      rd,
 		db:      db,
+		log:     log,
 	}
 }
 
@@ -166,33 +171,13 @@ func (a *Auth) VerifyOTP(phone string, otp string) error {
 
 }
 
-func (a *Auth) GenerateJWT(phone string) (string, error) {
+func (a *Auth) GenerateRefreshToken(id string) (string, error) {
 
 	token := jwt.New(jwt.SigningMethodEdDSA)
 	claims := token.Claims.(jwt.MapClaims)
 
-	q := queries.New(a.db)
-	ctx := context.Background()
-
-	user, err := q.GetUserFromPhone(ctx, phone)
-
-	if err == pgx.ErrNoRows {
-
-		claims["exp"] = time.Now().Add(20 * time.Minute).Unix()
-		claims["roles"] = []string{"new"}
-		claims["phone"] = phone
-
-	} else if err == nil {
-
-		claims["exp"] = time.Now().Add(2 * time.Hour).Unix()
-		claims["user"] = user.Name
-		claims["roles"] = []string{"user"}
-
-	} else {
-
-		return "", err
-
-	}
+	claims["exp"] = time.Now().Add(12 * time.Hour).Unix()
+	claims["sub"] = id
 
 	tokenString, err := token.SignedString(a.jwt_key)
 
@@ -201,6 +186,113 @@ func (a *Auth) GenerateJWT(phone string) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func (a *Auth) GenerateTokens(phone string) (string, string, error) {
+
+	q := queries.New(a.db)
+	ctx := context.Background()
+
+	user, err := q.GetUserFromPhone(ctx, phone)
+
+	if err == pgx.ErrNoRows {
+		token := jwt.New(jwt.SigningMethodEdDSA)
+		claims := token.Claims.(jwt.MapClaims)
+
+		claims["exp"] = time.Now().Add(20 * time.Minute).Unix()
+		claims["roles"] = []string{"new"}
+		claims["phone"] = phone
+
+		acc, err := token.SignedString(a.jwt_key)
+		return acc, "", err
+
+	} else if err == nil {
+
+		acc, err := a.GenerateUserJWT(user)
+
+		if err != nil {
+			a.log.Err(err).Msg("error generating access token")
+		}
+
+		id := strconv.Itoa(int(user.ID))
+		ref, err := a.GenerateRefreshToken(string(id))
+
+		if err != nil {
+
+			a.log.Err(err).Msg("error generating access token")
+		}
+
+		return acc, ref, err
+
+	}
+
+	return "", "", err
+
+}
+
+func (a *Auth) GenerateUserJWT(user queries.User) (string, error) {
+
+	token := jwt.New(jwt.SigningMethodEdDSA)
+	claims := token.Claims.(jwt.MapClaims)
+
+	claims["exp"] = time.Now().Add(2 * time.Hour).Unix()
+	claims["user"] = user.Name
+	claims["sub"] = user.ID
+	claims["roles"] = []string{"user"}
+
+	tokenString, err := token.SignedString(a.jwt_key)
+
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func (a *Auth) VerifyRefreshToken(token string) (*jwt.RegisteredClaims, error) {
+
+	tkn, err := a.VerifyJWT(token, &jwt.RegisteredClaims{})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := tkn.Claims.(*jwt.RegisteredClaims); ok && tkn.Valid {
+
+		return claims, nil
+
+	} else {
+
+		return nil, errors.New("invalid claims")
+
+	}
+
+}
+
+func (a *Auth) AccessFromRefresh(token string) (string, error) {
+
+	cl, err := a.VerifyRefreshToken(token)
+
+	if err != nil {
+		return "", err
+	}
+
+	q := queries.New(a.db)
+	ctx := context.Background()
+	sub, err := strconv.ParseInt(cl.Subject, 10, 64)
+
+	if err != nil {
+
+		return "", err
+	}
+	user, err := q.GetUser(ctx, sub)
+
+	if err != nil {
+		return "", err
+	}
+
+	return a.GenerateUserJWT(user)
+
 }
 
 func (a *Auth) VerifyJWT(token string, claims jwt.Claims) (*jwt.Token, error) {
@@ -271,7 +363,7 @@ func (a *Auth) RegisterUser(name string, email string, phone string) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23505"{
+			if pgErr.Code == "23505" {
 				return ErrUserAlreadyExist
 			}
 		}

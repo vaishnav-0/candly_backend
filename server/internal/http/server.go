@@ -15,10 +15,12 @@ import (
 	"candly/internal/config"
 	"candly/internal/http/handler"
 	"candly/internal/http/middleware"
+	"candly/pkg/utils"
 
 	// middleware "github.com/thnkrn/go-gin-clean-arch/pkg/api/middleware"
 	_ "candly/cmd/server/docs"
 
+	"github.com/jpillora/cookieauth"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -56,9 +58,13 @@ func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 		c.JSON(http.StatusOK, stats.Report())
 	})
 
+	swagProtectedHandler := func(c *gin.Context) {
+
+		cookieauth.Wrap(utils.WrapGin(ginSwagger.WrapHandler(swaggerFiles.Handler), c), "candly", conf.SwaggerAPIKey).ServeHTTP(c.Writer, c.Request)
+	}
+	println(conf.SwaggerAPIKey)
 	//swagger
-	engine.GET("/swagger/*any", middleware.AuthorizeAPIKey(conf.SwaggerAPIKey),
-		ginSwagger.WrapHandler(swaggerFiles.Handler))
+	engine.GET("/swagger/*any", swagProtectedHandler)
 
 	api := engine.Group("/api")
 
@@ -67,6 +73,7 @@ func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 		auth.POST("/validate", handler.VerifyOTP(dep.Auth, dep.Log))
 		auth.POST("/generateOTP", handler.GenerateOTP(dep.Auth, dep.Log))
 		auth.POST("/register", middleware.AuthorizeNewUserToken(dep.Auth), handler.RegisterUser(dep.Auth, dep.Log))
+		auth.POST("/refresh", handler.RefreshToken(dep.Auth, dep.Log))
 	}
 
 	authorized := api.Group("/")

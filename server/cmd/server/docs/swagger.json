@@ -14,32 +14,49 @@
     "host": "localhost:3000",
     "basePath": "/api",
     "paths": {
-        "/": {
+        "/pool": {
             "get": {
-                "description": "get details of all pools.",
-                "consumes": [
-                    "*/*"
-                ],
+                "description": "get the details of all the pools",
                 "produces": [
                     "application/json"
                 ],
-                "tags": [
-                    "pools"
-                ],
-                "summary": "Get all the pools.",
+                "summary": "Get pools",
+                "operationId": "get-pools",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/market.PoolData"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error"
+                    "400": {
+                        "description": "Bad Request"
                     }
                 }
             }
+        }
+    },
+    "definitions": {
+        "market.PoolData": {
+            "type": "object",
+            "properties": {
+                "closeTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "openTime": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }
