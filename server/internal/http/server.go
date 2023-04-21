@@ -74,6 +74,7 @@ func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 		auth.POST("/generateOTP", handler.GenerateOTP(dep.Auth, dep.Log))
 		auth.POST("/register", middleware.AuthorizeNewUserToken(dep.Auth), handler.RegisterUser(dep.Auth, dep.Log))
 		auth.POST("/refresh", handler.RefreshToken(dep.Auth, dep.Log))
+		auth.POST("/revoke", handler.RevokeRefreshToken(dep.Auth, dep.Log))
 	}
 
 	authorized := api.Group("/")

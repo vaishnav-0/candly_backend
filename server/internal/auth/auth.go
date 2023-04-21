@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"golang.org/x/crypto/ssh"
 
@@ -38,6 +39,8 @@ var ErrOTPTriesExceeded = errors.New("OTP tries reached")
 
 var ErrUserAlreadyExist = errors.New("user already exist")
 var ErrUserUnregistered = errors.New("user already exist")
+
+var ErrInvalidRefreshToken = errors.New("invalid refresh token")
 
 type Auth struct {
 	jwt_key interface{}
@@ -176,8 +179,20 @@ func (a *Auth) GenerateRefreshToken(id string) (string, error) {
 	token := jwt.New(jwt.SigningMethodEdDSA)
 	claims := token.Claims.(jwt.MapClaims)
 
-	claims["exp"] = time.Now().Add(12 * time.Hour).Unix()
+	guid := xid.New().String()
+
+	exp := time.Now().Add(12 * time.Hour)
+
+	claims["exp"] = exp.Unix()
 	claims["sub"] = id
+	claims["jti"] = guid
+
+	ctx := context.Background()
+	_, err := a.rd.Set(ctx, authRefreshPrefix+guid, true, time.Until(exp)).Result()
+
+	if err != nil {
+		return "", err
+	}
 
 	tokenString, err := token.SignedString(a.jwt_key)
 
@@ -259,6 +274,16 @@ func (a *Auth) VerifyRefreshToken(token string) (*jwt.RegisteredClaims, error) {
 
 	if claims, ok := tkn.Claims.(*jwt.RegisteredClaims); ok && tkn.Valid {
 
+		res, err := a.rd.Exists(context.Background(), authRefreshPrefix+claims.ID).Result()
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res != 1 {
+			return nil, ErrInvalidRefreshToken
+		}
+
 		return claims, nil
 
 	} else {
@@ -267,6 +292,25 @@ func (a *Auth) VerifyRefreshToken(token string) (*jwt.RegisteredClaims, error) {
 
 	}
 
+}
+
+func (a *Auth) RevokeRefresh(token string) error {
+	tkn, err := a.VerifyJWT(token, &jwt.RegisteredClaims{})
+
+	if err != nil {
+		return err
+	}
+
+	if claims, ok := tkn.Claims.(*jwt.RegisteredClaims); ok && tkn.Valid {
+		_, err := a.rd.Del(context.Background(), authRefreshPrefix+claims.ID).Result()
+
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
 }
 
 func (a *Auth) AccessFromRefresh(token string) (string, error) {

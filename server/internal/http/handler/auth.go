@@ -19,6 +19,7 @@ type VerifyOTPBody struct {
 	Otp   string `json:"otp"`
 }
 
+
 func GenerateOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -158,6 +159,11 @@ func RefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 		access, err := a.AccessFromRefresh(body.Token)
 
+		if err == auth.ErrInvalidRefreshToken{
+			c.AbortWithStatusJSON(http.StatusUnauthorized, helpers.JSONMessage(err.Error()))
+			return
+		}
+
 		if err != nil {
 			log.Error().Err(err).Msg("cannot generate access token")
 			c.AbortWithStatus(http.StatusInternalServerError)
@@ -165,6 +171,30 @@ func RefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"access_token": access})
+
+	}
+}
+
+
+func RevokeRefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+
+		body := RefreshTokenBody{}
+		if err := c.BindJSON(&body); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
+			return
+		}
+
+		err := a.RevokeRefresh(body.Token)
+
+		if err != nil {
+			log.Error().Err(err).Msg("cannot revoke refresh token")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		c.JSON(http.StatusOK, helpers.JSONMessage("successful"))
 
 	}
 }
