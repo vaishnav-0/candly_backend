@@ -22,7 +22,8 @@ jobs:
         go-version: 1.19
 
     - name: Build
-      run: go build -v ./server/cmd/server/server.go
+      working-directory: ./server
+      run: go build -v ./cmd/server/server.go
 
 #    - name: Test
 #      run: go test -v ./...
