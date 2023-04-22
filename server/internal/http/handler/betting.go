@@ -25,6 +25,7 @@ type BettingData struct {
 //	@Summary		Get pools
 //	@Description	get the details of all the pools
 //	@ID				get-pools
+//	@Tags			pool
 //	@Produce		json	
 //	@Success		200		{object}	market.PoolData
 //	@Failure		400

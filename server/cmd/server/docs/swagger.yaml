@@ -1,5 +1,75 @@
 basePath: /api
 definitions:
+  handler.GenerateOTPBody:
+    properties:
+      phone:
+        type: string
+    required:
+    - phone
+    type: object
+  handler.GenerateOTPResp:
+    properties:
+      otp:
+        type: string
+    type: object
+  handler.RefreshTokenBody:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
+  handler.RefreshTokenRes:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  handler.RegisterUserBody:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  handler.VerifyOTPBody:
+    properties:
+      otp:
+        type: string
+      phone:
+        type: string
+    type: object
+  handler.VerifyOTPRes:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  helpers.ApiError:
+    properties:
+      message:
+        type: string
+      param:
+        type: string
+    type: object
+  helpers.HTTPMessage:
+    properties:
+      message:
+        type: string
+    type: object
+  helpers.ValidationError:
+    properties:
+      errors:
+        items:
+          $ref: '#/definitions/helpers.ApiError'
+        type: array
+      message:
+        type: string
+    type: object
   market.PoolData:
     properties:
       closeTime:
@@ -20,6 +90,161 @@ info:
   title: Candly
   version: "1.0"
 paths:
+  /auth/generateOTP:
+    post:
+      description: Generate an OTP for authentication
+      operationId: genOTP
+      parameters:
+      - description: Phone number
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.GenerateOTPBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GenerateOTPResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ValidationError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Generate OTP
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      description: Refresh access token
+      operationId: refTkn
+      parameters:
+      - description: refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RefreshTokenBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.RefreshTokenRes'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ValidationError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Refresh token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      description: Register a new user
+      operationId: regUser
+      parameters:
+      - description: User details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterUserBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VerifyOTPRes'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ValidationError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Register user
+      tags:
+      - auth
+  /auth/revoke:
+    post:
+      description: Revoke the given refresh token
+      operationId: revRefTkn
+      parameters:
+      - description: refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RefreshTokenBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ValidationError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Revoke refresh token
+      tags:
+      - auth
+  /auth/validate:
+    post:
+      description: Validate an OTP and generate tokens
+      operationId: valOTP
+      parameters:
+      - description: phone and otp
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VerifyOTPBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VerifyOTPRes'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ValidationError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Validate OTP
+      tags:
+      - auth
   /pool:
     get:
       description: get the details of all the pools
@@ -34,6 +259,8 @@ paths:
         "400":
           description: Bad Request
       summary: Get pools
+      tags:
+      - pool
 securityDefinitions:
   ApiKeyAuth:
     in: header

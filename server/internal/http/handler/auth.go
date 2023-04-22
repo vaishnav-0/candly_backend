@@ -11,21 +11,32 @@ import (
 )
 
 type GenerateOTPBody struct {
-	Phone string `json:"phone"`
+	Phone string `json:"phone" binding:"required"`
 }
 
-type VerifyOTPBody struct {
-	Phone string `json:"phone"`
-	Otp   string `json:"otp"`
+type GenerateOTPResp struct{
+	Otp string `json:"otp"`
 }
 
-
+// GenerateOTP
+//
+//	@Summary		Generate OTP
+//	@Description	Generate an OTP for authentication
+//	@Tags			auth
+//	@ID				genOTP
+//	@Produce		json	
+//	@Param			body	body		GenerateOTPBody	true	"Phone number"
+//	@Success		200		{object}	GenerateOTPResp
+//	@Failure		400		{object}	helpers.ValidationError
+//	@Failure		401		{object}	helpers.HTTPMessage
+//	@Failure		500
+//	@Router			/auth/generateOTP [post]
 func GenerateOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		body := GenerateOTPBody{}
 		if err := c.BindJSON(&body); err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number is required"))
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
 			return
 		}
 
@@ -47,19 +58,45 @@ func GenerateOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"otp": otp})
+		c.JSON(http.StatusOK, GenerateOTPResp{otp})
 
 	}
 
 }
 
+
+
+type VerifyOTPBody struct {
+	Phone string `json:"phone"`
+	Otp   string `json:"otp"`
+}
+
+
+type VerifyOTPRes struct {
+	Refresh_token string `json:"refresh_token"`
+	Access_token string `json:"access_token"`
+}
+
+// ValidateOTP
+//
+//	@Summary		Validate OTP
+//	@Description	Validate an OTP and generate tokens
+//	@Tags			auth
+//	@ID				valOTP
+//	@Produce		json	
+//	@Param			body	body		VerifyOTPBody	true	"phone and otp"
+//	@Success		200		{object}	VerifyOTPRes
+//	@Failure		400		{object}	helpers.ValidationError
+//	@Failure		401		{object}	helpers.HTTPMessage
+//	@Failure		500
+//	@Router			/auth/validate [post]
 func VerifyOTP(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
 		body := VerifyOTPBody{}
 		if err := c.BindJSON(&body); err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.JSONMessage("mobile number and otp is required"))
+			c.AbortWithStatusJSON(http.StatusBadRequest, helpers.GenerateValidationError(err))
 			return
 		}
 
@@ -102,6 +139,19 @@ type RegisterUserBody struct {
 	Email string `json:"email" binding:"email"`
 }
 
+// RegisterUser
+//
+//	@Summary		Register user
+//	@Description	Register a new user
+//	@Tags			auth
+//	@ID				regUser
+//	@Produce		json	
+//	@Param			body	body		RegisterUserBody	true	"User details"
+//	@Success		200		{object}	VerifyOTPRes
+//	@Failure		400		{object}	helpers.ValidationError
+//	@Failure		401		{object}	helpers.HTTPMessage
+//	@Failure		500
+//	@Router			/auth/register [post]
 func RegisterUser(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		body := RegisterUserBody{}
@@ -143,10 +193,27 @@ func RegisterUser(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 }
 
+type RefreshTokenRes struct {
+	Refresh_token string `json:"refresh_token"`
+	Access_token string `json:"access_token"`
+}
 type RefreshTokenBody struct {
 	Token string `json:"token"  binding:"required"`
 }
 
+// RefreshToken
+//
+//	@Summary		Refresh token
+//	@Description	Refresh access token
+//	@Tags			auth
+//	@ID				refTkn
+//	@Produce		json	
+//	@Param			body	body		RefreshTokenBody	true	"refresh token"
+//	@Success		200		{object}	RefreshTokenRes
+//	@Failure		400		{object}	helpers.ValidationError
+//	@Failure		401		{object}	helpers.HTTPMessage
+//	@Failure		500
+//	@Router			/auth/refresh [post]
 func RefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -175,7 +242,19 @@ func RefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 	}
 }
 
-
+// RevokeRefreshToken
+//
+//	@Summary		Revoke refresh token
+//	@Description	Revoke the given refresh token
+//	@Tags			auth
+//	@ID				revRefTkn
+//	@Produce		json	
+//	@Param			body	body		RefreshTokenBody	true	"refresh token"
+//	@Success		200		{object}	helpers.HTTPMessage
+//	@Failure		400		{object}	helpers.ValidationError
+//	@Failure		401		{object}	helpers.HTTPMessage
+//	@Failure		500
+//	@Router			/auth/revoke [post]
 func RevokeRefreshToken(a *auth.Auth, log *zerolog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {

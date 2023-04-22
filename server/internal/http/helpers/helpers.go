@@ -9,6 +9,10 @@ import (
 	"candly/internal/auth"
 )
 
+type HTTPMessage struct {
+	Message string
+}
+
 func AppendJSONMessage(message string, extra map[string]interface{}) map[string]interface{} {
 	extra["message"] = message
 	return extra
@@ -34,8 +38,8 @@ func msgForTag(fe validator.FieldError) string {
 }
 
 type ApiError struct {
-	Param   string
-	Message string
+	Param   string	`json:"param"`
+	Message string	`json:"message"`
 }
 
 func SerializeValidationErr(err error) []ApiError {
@@ -50,6 +54,12 @@ func SerializeValidationErr(err error) []ApiError {
 
 	return []ApiError{}
 
+}
+
+
+type ValidationError struct{
+	Message string	`json:"message"`
+	Errors []ApiError `json:"errors"`
 }
 
 func GenerateValidationError(err error) map[string]interface{} {
