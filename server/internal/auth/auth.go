@@ -252,7 +252,7 @@ func (a *Auth) GenerateUserJWT(user queries.User) (string, error) {
 
 	claims["exp"] = time.Now().Add(2 * time.Hour).Unix()
 	claims["user"] = user.Name
-	claims["sub"] = user.ID
+	claims["sub"] = strconv.FormatInt(user.ID, 10)
 	claims["roles"] = []string{"user"}
 
 	tokenString, err := token.SignedString(a.jwt_key)
