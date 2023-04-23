@@ -20,14 +20,14 @@ type BettingData struct {
 	Amount int64
 }
 
-// GetStringByInt example
+// GetPools
 //
 //	@Summary		Get pools
 //	@Description	get the details of all the pools
 //	@ID				get-pools
 //	@Tags			pool
-//	@Produce		json	
-//	@Success		200		{object}	market.PoolData
+//	@Produce		json
+//	@Success		200		{object}	[]market.PoolData
 //	@Failure		400
 //	@Router			/pool [get]
 func GetPools(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
@@ -45,6 +45,20 @@ func GetPools(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 	}
 }
 
+// GetBets
+//
+//	@Summary		Get bets
+//	@Description	Get the details of bets for a given pool
+//	@ID				get-bets
+//	@Tags			pool
+//	@Produce		json
+//
+// @Param 			pool_id   path string true "pool ID"
+//
+//	@Success		200		{object}	betting.BetData  "The json contains statistics with stat: prefix and user bet amounts"
+//	@Failure		500
+//	@Failure		404		{object} 	helpers.HTTPMessage
+//	@Router			/pool/{pool_id} [get]
 func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		bets, err := betting.GetBets(rd, c.Param("id"))
@@ -63,6 +77,16 @@ func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 	}
 }
 
+// Bet
+//
+//	@Summary		Bet
+//	@Description	Bet an amount on a pool
+//	@ID				bet
+//	@Tags			pool
+//  @Param	PoolData  body BettingData 		true	"Pool data"
+//	@Success		200
+//	@Failure		400		{object}  helpers.HTTPMessage
+//	@Router			/pool/bet [post]
 func Bet(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {

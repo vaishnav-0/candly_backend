@@ -264,7 +264,10 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/market.PoolData"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/market.PoolData"
+                            }
                         }
                     },
                     "400": {
@@ -272,9 +275,111 @@
                     }
                 }
             }
+        },
+        "/pool/bet": {
+            "post": {
+                "description": "Bet an amount on a pool",
+                "tags": [
+                    "pool"
+                ],
+                "summary": "Bet",
+                "operationId": "bet",
+                "parameters": [
+                    {
+                        "description": "Pool data",
+                        "name": "PoolData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BettingData"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.HTTPMessage"
+                        }
+                    }
+                }
+            }
+        },
+        "/pool/{pool_id}": {
+            "get": {
+                "description": "Get the details of bets for a given pool",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pool"
+                ],
+                "summary": "Get bets",
+                "operationId": "get-bets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "pool ID",
+                        "name": "pool_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The json contains statistics with stat: prefix and user bet amounts",
+                        "schema": {
+                            "$ref": "#/definitions/betting.BetData"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.HTTPMessage"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "betting.BetData": {
+            "type": "object",
+            "properties": {
+                "stat:green": {
+                    "type": "string"
+                },
+                "stat:red": {
+                    "type": "string"
+                },
+                "stat:total": {
+                    "type": "string"
+                },
+                "user1": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.BettingData": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.GenerateOTPBody": {
             "type": "object",
             "required": [

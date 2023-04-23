@@ -17,6 +17,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const BetStatPrefix = "stat:"
+
 func OnUpdate(store *redis.Client, db *pgxpool.Pool, log *zerolog.Logger) (c chan market.UpdatePoolData) {
 	ch := make(chan market.UpdatePoolData)
 
@@ -51,6 +53,13 @@ func CreatePool(store *redis.Client, id string, expiry time.Duration) error {
 	return nil
 }
 
+type BetData struct {
+	Total string `json:"stat:total"`
+	Red   string `json:"stat:red"`
+	Green string `json:"stat:green"`
+	User  string `json:"user1"`
+}
+
 func Bet(store *redis.Client, id string, user string, amount int64) error {
 	ctx := context.Background()
 	pipe := store.Pipeline()
@@ -79,20 +88,22 @@ func Bet(store *redis.Client, id string, user string, amount int64) error {
 
 	_ = pipe.HSet(ctx, id, user, amount)
 	diff := int64(math.Abs(float64(amount))) - int64(math.Abs(float64(bet)))
-	_ = pipe.HIncrBy(ctx, id, "total", diff)
+	_ = pipe.HIncrBy(ctx, id, BetStatPrefix+"total", diff)
+	redKey := BetStatPrefix + "red"
+	greenKey := BetStatPrefix + "green"
 	if bet < 0 {
 		if amount < 0 {
-			_ = pipe.HIncrBy(ctx, id, "red", diff)
+			_ = pipe.HIncrBy(ctx, id, redKey, diff)
 		} else {
-			_ = pipe.HIncrBy(ctx, id, "red", -bet)
-			_ = pipe.HIncrBy(ctx, id, "green", amount)
+			_ = pipe.HIncrBy(ctx, id, redKey, -bet)
+			_ = pipe.HIncrBy(ctx, id, greenKey, amount)
 		}
 	} else {
 		if amount >= 0 {
-			_ = pipe.HIncrBy(ctx, id, "green", diff)
+			_ = pipe.HIncrBy(ctx, id, greenKey, diff)
 		} else {
-			_ = pipe.HIncrBy(ctx, id, "red", int64(math.Abs(float64(amount))))
-			_ = pipe.HIncrBy(ctx, id, "green", -bet)
+			_ = pipe.HIncrBy(ctx, id, redKey, int64(math.Abs(float64(amount))))
+			_ = pipe.HIncrBy(ctx, id, greenKey, -bet)
 		}
 	}
 
@@ -114,8 +125,8 @@ func GetPools(store *redis.Client) ([]map[string]string, error) {
 	for _, poolType := range market.PoolTypes {
 		ctx := context.Background()
 		res, err := store.HGetAll(ctx, poolType.Type).Result()
-		
-		if len(res) == 0{
+
+		if len(res) == 0 {
 			continue
 		}
 

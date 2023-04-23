@@ -1,5 +1,25 @@
 basePath: /api
 definitions:
+  betting.BetData:
+    properties:
+      stat:green:
+        type: string
+      stat:red:
+        type: string
+      stat:total:
+        type: string
+      user1:
+        type: string
+    type: object
+  handler.BettingData:
+    properties:
+      amount:
+        type: integer
+      id:
+        type: string
+      user:
+        type: string
+    type: object
   handler.GenerateOTPBody:
     properties:
       phone:
@@ -255,10 +275,60 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/market.PoolData'
+            items:
+              $ref: '#/definitions/market.PoolData'
+            type: array
         "400":
           description: Bad Request
       summary: Get pools
+      tags:
+      - pool
+  /pool/{pool_id}:
+    get:
+      description: Get the details of bets for a given pool
+      operationId: get-bets
+      parameters:
+      - description: pool ID
+        in: path
+        name: pool_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'The json contains statistics with stat: prefix and user bet
+            amounts'
+          schema:
+            $ref: '#/definitions/betting.BetData'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+        "500":
+          description: Internal Server Error
+      summary: Get bets
+      tags:
+      - pool
+  /pool/bet:
+    post:
+      description: Bet an amount on a pool
+      operationId: bet
+      parameters:
+      - description: Pool data
+        in: body
+        name: PoolData
+        required: true
+        schema:
+          $ref: '#/definitions/handler.BettingData'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.HTTPMessage'
+      summary: Bet
       tags:
       - pool
 securityDefinitions:
