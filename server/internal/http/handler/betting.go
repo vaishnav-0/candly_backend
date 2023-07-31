@@ -4,15 +4,22 @@ import (
 	"candly/internal/auth"
 	"candly/internal/betting"
 	"candly/internal/http/helpers"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-redis/redis/v9"
+	"github.com/gorilla/websocket"
+	"github.com/jonhoo/go-events"
 	"github.com/rs/zerolog"
-
-	_ "github.com/swaggo/swag/example/basic/web"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
 
 type BettingData struct {
 	Id     string
@@ -79,14 +86,14 @@ func GetBets(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 // Bet
 //
-//	@Summary		Bet
-//	@Description	Bet an amount on a pool
-//	@ID				bet
-//	@Tags			pool
-//  @Param	PoolData  body BettingData 		true	"Pool data"
-//	@Success		200
-//	@Failure		400		{object}  helpers.HTTPMessage
-//	@Router			/pool/bet [post]
+//		@Summary		Bet
+//		@Description	Bet an amount on a pool
+//		@ID				bet
+//		@Tags			pool
+//	 @Param	PoolData  body BettingData 		true	"Pool data"
+//		@Success		200
+//		@Failure		400		{object}  helpers.HTTPMessage
+//		@Router			/pool/bet [post]
 func Bet(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -109,5 +116,56 @@ func Bet(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
 
 		c.Status(http.StatusOK)
 
+	}
+}
+
+func BetWS(rd *redis.Client, log *zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		//TODO check if id is valid
+		evCh := events.Listen(id)
+		// if err != nil {
+		// 	log.Error().Err(err).Msg("cannot get bets")
+		// 	c.Status(http.StatusInternalServerError)
+		// 	return
+		// }
+
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer conn.Close()
+
+		for e := range evCh {
+			b, err := json.Marshal(e.Data)
+			if err != nil {
+				fmt.Println("error:", err)
+			}
+			
+			err = conn.WriteMessage(websocket.TextMessage, b)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			fmt.Println(e.Tag)
+
+		}
+
+		// for {
+		// 	// messageType, p, err := conn.ReadMessage()
+		// 	// if err != nil {
+		// 	// 	fmt.Println(err)
+		// 	// 	return
+		// 	// }
+
+		// 	// Echo back the message
+		// 	err = conn.WriteMessage(messageType, p)
+		// 	if err != nil {
+		// 		fmt.Println(err)
+		// 		return
+		// 	}
+		// }
 	}
 }

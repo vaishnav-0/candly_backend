@@ -66,6 +66,7 @@ func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 	//swagger
 	engine.GET("/swagger/*any", swagProtectedHandler)
 
+	
 	api := engine.Group("/api")
 
 	auth := api.Group("/auth")
@@ -87,6 +88,7 @@ func NewServerHTTP(conf Config, dep *Dep) *ServerHTTP {
 			pool.GET("", handler.GetPools(dep.Rd, dep.Log))
 			pool.GET("/:id", handler.GetBets(dep.Rd, dep.Log))
 			pool.POST("/bet", handler.Bet(dep.Rd, dep.Log))
+			pool.GET("/ws/:id", handler.BetWS(dep.Rd, dep.Log))
 		}
 
 	}
