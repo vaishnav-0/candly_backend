@@ -64,8 +64,8 @@ func updateDataPeriodic(pool PoolInfo, store *redis.Client, log *zerolog.Logger,
 
 type PoolData struct {
 	Id        string
-	OpenTime  string 
-	CloseTime string 
+	OpenTime  string
+	CloseTime string
 }
 
 func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan<- UpdatePoolData) {
@@ -78,19 +78,21 @@ func updateData(pool PoolInfo, store *redis.Client, log *zerolog.Logger, ch chan
 
 	prevPoolData, err := memstore.GetHash(store, pool.Type)
 
+	var prevPool Pool
 	if err != nil {
 		log.Err(err).Msg("Failed to get pool previous pool id: " + pool.Type)
 		return
 	}
+	if len(prevPoolData) != 0 {
+		prevClose, _ := strconv.ParseInt(prevPoolData["closeTime"], 10, 64)
+		prevOpen, _ := strconv.ParseInt(prevPoolData["openTime"], 10, 64)
 
-	prevClose, _ := strconv.ParseInt(prevPoolData["closeTime"], 10, 64)
-	prevOpen, _ := strconv.ParseInt(prevPoolData["openTime"], 10, 64)
-
-	prevPool := Pool{
-		Id:        prevPoolData["id"],
-		PoolInfo:  pool,
-		OpenTime:  prevOpen,
-		CloseTime: prevClose,
+		prevPool = Pool{
+			Id:        prevPoolData["id"],
+			PoolInfo:  pool,
+			OpenTime:  prevOpen,
+			CloseTime: prevClose,
+		}
 	}
 
 	guid := xid.New()
