@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS bets(
-    id VARCHAR(22) PRIMARY KEY,
-    user_id BIGINT REFERENCES users(id) ,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY ,
+    user_id VARCHAR(100) REFERENCES users(name) ,
 	pool_id VARCHAR(25) REFERENCES pools(id),
 	amount INTEGER, 
 	won BOOLEAN 

@@ -54,11 +54,21 @@ func (ns NullPoolType) Value() (driver.Value, error) {
 }
 
 type Bet struct {
-	ID     string
-	UserID pgtype.Int8
+	ID     int64
+	UserID pgtype.Text
 	PoolID pgtype.Text
 	Amount pgtype.Int4
 	Won    pgtype.Bool
+}
+
+type BetStat struct {
+	PoolID    string
+	Total     pgtype.Int4
+	Red       pgtype.Int4
+	Green     pgtype.Int4
+	TotalBets pgtype.Int4
+	RedBets   pgtype.Int4
+	GreenBets pgtype.Int4
 }
 
 type Pool struct {

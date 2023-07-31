@@ -11,6 +11,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type CreateBetParams struct {
+	UserID pgtype.Text
+	PoolID pgtype.Text
+	Amount pgtype.Int4
+}
+
+const createBetStat = `-- name: CreateBetStat :exec
+INSERT INTO bet_stats (
+  pool_id, total, red, green, total_bets, red_bets, green_bets
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7
+)
+`
+
+type CreateBetStatParams struct {
+	PoolID    string
+	Total     pgtype.Int4
+	Red       pgtype.Int4
+	Green     pgtype.Int4
+	TotalBets pgtype.Int4
+	RedBets   pgtype.Int4
+	GreenBets pgtype.Int4
+}
+
+func (q *Queries) CreateBetStat(ctx context.Context, arg CreateBetStatParams) error {
+	_, err := q.db.Exec(ctx, createBetStat,
+		arg.PoolID,
+		arg.Total,
+		arg.Red,
+		arg.Green,
+		arg.TotalBets,
+		arg.RedBets,
+		arg.GreenBets,
+	)
+	return err
+}
+
 const createPool = `-- name: CreatePool :exec
 INSERT INTO pools (
   id, open_time, close_time, type
@@ -33,6 +70,15 @@ func (q *Queries) CreatePool(ctx context.Context, arg CreatePoolParams) error {
 		arg.CloseTime,
 		arg.Type,
 	)
+	return err
+}
+
+const deletePool = `-- name: DeletePool :exec
+DELETE FROM pools where id=$1
+`
+
+func (q *Queries) DeletePool(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deletePool, id)
 	return err
 }
 
