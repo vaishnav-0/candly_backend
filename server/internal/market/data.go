@@ -26,7 +26,12 @@ var Intervals interval = interval{
 	},
 }
 
+type PoolTypeString string
+
+const BTUSDT1m, BTUSDT5m PoolTypeString = "BTUSDT1m", "BTUSDT5m"
+
 type PoolInfo struct {
+	Id       PoolTypeString
 	Type     string
 	Symbol   string
 	Interval intervalDet
@@ -34,12 +39,12 @@ type PoolInfo struct {
 
 type Pool struct {
 	PoolInfo
-	Id string
-	OpenTime int64
+	Id        string
+	OpenTime  int64
 	CloseTime int64
 }
 
 var PoolTypes = []PoolInfo{
-	{"BTUSDT1m", "BTCUSDT", Intervals.oneMin},
-	{"BTUSDT5m", "BTCUSDT", Intervals.fiveMin},
+	{"BTUSDT1m", "BTUSDT1m", "BTCUSDT", Intervals.oneMin},
+	{"BTUSDT5m", "BTUSDT5m", "BTCUSDT", Intervals.fiveMin},
 }
