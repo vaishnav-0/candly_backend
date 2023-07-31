@@ -25,6 +25,7 @@ type Config struct {
 	Logging logging.Config
 	JWTKey string `env:"JWT_KEY"`
 	JWTPub string `env:"JWT_PUB"`
+	APIKey string `env:"API_KEY"`
 }
 
 func GetConfig() Config {
